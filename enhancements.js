@@ -96,25 +96,36 @@
     document.getElementById("duplicateConfirmDialog").showModal();
   }
 
+  function setEditorHeading() {
+    if (!draft) return;
+    els.editorTitle.textContent = items.some(item => item.id === draft.id) ? "Editar símbolo" : "Novo símbolo";
+  }
+
   function clarifyCopyButtons() {
     document.querySelectorAll(".copy-button span").forEach(span => {
       span.textContent = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+    });
+    document.querySelectorAll("#copyVariantsList button > span:last-child").forEach(span => {
+      span.textContent = "Copiar código";
     });
   }
 
   ensureDuplicateUI();
   els.save.addEventListener("click", interceptDuplicateSave, true);
   els.name.addEventListener("input", updateDuplicateWarning);
+  els.name.addEventListener("input", setEditorHeading);
   els.svg.addEventListener("input", updateDuplicateWarning);
   els.variantLabel.addEventListener("input", updateDuplicateWarning);
   els.variantTabs.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
   els.addVariant.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
   els.paste.addEventListener("click", () => setTimeout(updateDuplicateWarning, 80));
   els.format.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
+  els.copyDialog.addEventListener("click", () => setTimeout(clarifyCopyButtons, 0));
 
   const originalOpenEditor = openEditor;
   openEditor = function(id = null) {
     originalOpenEditor(id);
+    setEditorHeading();
     setTimeout(updateDuplicateWarning, 0);
   };
 
