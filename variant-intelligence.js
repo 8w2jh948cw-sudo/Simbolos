@@ -1,5 +1,11 @@
 (() => {
   const TYPE_LABELS = new Set(["padrão", "preenchido", "contorno", "misto", "preenchido em camadas", "svg"]);
+  const GENERIC_TOKENS = new Set([
+    "svg","icon","icons","path","paths","group","layer","symbol","shape","vector","image",
+    "lucide","tabler","outline","outlined","stroke","line","fill","filled","solid","currentcolor",
+    "apple","native","coresvg","generator","xmlns","http","https","www","org","class","data",
+    "width","height","viewbox","none","round","rounding","regular","default","standard"
+  ]);
 
   function styleValue(el, property) {
     const style = el.getAttribute("style") || "";
@@ -33,7 +39,10 @@
 
   function detectVariantType(svgCode, title) {
     const parsed = parseSvg(svgCode);
-    if (!parsed.ok) return { type: detectFromTitle(title) || "SVG", source: detectFromTitle(title) ? "nome" : "indefinido" };
+    if (!parsed.ok) {
+      const hint = detectFromTitle(title);
+      return { type: hint || "SVG", source: hint ? "nome" : "indefinido" };
+    }
 
     const root = parsed.root;
     const graphics = [...root.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")];
@@ -47,7 +56,6 @@
       const stroke = inheritedPaint(el, "stroke", "none");
       if (tag !== "line" && isVisiblePaint(fill)) hasFill = true;
       if (isVisiblePaint(stroke)) hasStroke = true;
-
       const opacity = Number(el.getAttribute("fill-opacity") || styleValue(el, "fill-opacity"));
       if (Number.isFinite(opacity) && opacity > 0 && opacity < 1 && isVisiblePaint(fill)) layeredFill = true;
     });
@@ -110,7 +118,6 @@
   function mergeIntoFamily() {
     const target = matchingFamily();
     if (!target || !draft) return;
-
     const validation = validateDraft();
     if (!validation.ok) {
       validation.focus?.focus();
@@ -172,28 +179,115 @@
     if (dialog) dialog.hidden = !visible;
   }
 
+  function normalizeWords(value) {
+    return String(value || "")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .flatMap(word => word.length > 8 && word.endsWith("path") ? [word, word.slice(0, -4)] : [word])
+      .filter(word => word.length >= 3 && !GENERIC_TOKENS.has(word) && !/^\d+$/.test(word));
+  }
+
+  function semanticEvidence(svgCode) {
+    const parsed = parseSvg(svgCode);
+    if (!parsed.ok) return [];
+    const root = parsed.root;
+    const evidence = [];
+    const textSelectors = ["title", "desc"];
+    textSelectors.forEach(selector => root.querySelectorAll(selector).forEach(el => evidence.push(el.textContent || "")));
+    [root, ...root.querySelectorAll("*")].forEach(el => {
+      ["id", "class", "name", "aria-label", "data-name", "data-icon", "data-icon-name", "data-lucide"].forEach(attr => {
+        if (el.hasAttribute(attr)) evidence.push(el.getAttribute(attr));
+      });
+    });
+    const comments = String(svgCode || "").match(/<!--[\s\S]*?-->/g) || [];
+    evidence.push(...comments.map(comment => comment.replace(/^<!--|-->$/g, "")));
+    return [...new Set(normalizeWords(evidence.join(" ")))];
+  }
+
+  function titleTokens(title) {
+    return [...new Set(normalizeWords(title))];
+  }
+
+  function semanticCheck(title, svgCode) {
+    const titleWords = titleTokens(title);
+    const evidenceWords = semanticEvidence(svgCode);
+    if (!titleWords.length || !String(svgCode || "").trim()) return { status: "idle", titleWords, evidenceWords, matches: [] };
+    if (!evidenceWords.length) return { status: "unknown", titleWords, evidenceWords, matches: [] };
+
+    const matches = titleWords.filter(word => evidenceWords.some(ev => ev === word || ev.includes(word) || word.includes(ev)));
+    if (matches.length) return { status: "match", titleWords, evidenceWords, matches };
+
+    const meaningfulEvidence = evidenceWords.filter(word => word.length >= 4).slice(0, 6);
+    if (!meaningfulEvidence.length) return { status: "unknown", titleWords, evidenceWords, matches: [] };
+    return { status: "mismatch", titleWords, evidenceWords: meaningfulEvidence, matches: [] };
+  }
+
+  function ensureSemanticUI() {
+    if (document.getElementById("semanticCheckCard")) return;
+    const card = document.createElement("section");
+    card.id = "semanticCheckCard";
+    card.className = "semantic-check-card";
+    card.hidden = true;
+    card.innerHTML = `<div class="semantic-check-icon" aria-hidden="true">!</div><div class="semantic-check-copy"><strong id="semanticCheckTitle">Revisar título e SVG</strong><p id="semanticCheckText"></p><small id="semanticCheckEvidence"></small></div>`;
+    const duplicateWarning = document.getElementById("duplicateWarning");
+    if (duplicateWarning) duplicateWarning.insertAdjacentElement("afterend", card);
+    else document.querySelector(".sheet-scroll .form-card")?.insertAdjacentElement("afterend", card);
+  }
+
+  function updateSemanticCheck() {
+    ensureSemanticUI();
+    const card = document.getElementById("semanticCheckCard");
+    const heading = document.getElementById("semanticCheckTitle");
+    const text = document.getElementById("semanticCheckText");
+    const evidence = document.getElementById("semanticCheckEvidence");
+    if (!card || !draft) return;
+
+    const result = semanticCheck(els.name.value, els.svg.value);
+    card.dataset.status = result.status;
+    card.hidden = !["mismatch", "match"].includes(result.status);
+
+    if (result.status === "mismatch") {
+      heading.textContent = "Título e SVG podem não corresponder";
+      text.textContent = "O código contém pistas de outro nome. Confira se você colou o título e o SVG do mesmo ícone.";
+      evidence.textContent = `Pistas encontradas no SVG: ${result.evidenceWords.join(", ")}.`;
+    } else if (result.status === "match") {
+      heading.textContent = "Título compatível com o SVG";
+      text.textContent = "Encontrei pistas no próprio código que combinam com o título informado.";
+      evidence.textContent = `Coincidência: ${result.matches.join(", ")}.`;
+    }
+  }
+
   function clarifyImportantActions() {
-    els.paste.innerHTML = `<span aria-hidden="true">⤓</span> Colar código SVG`;
-    els.copyOutput.textContent = "Copiar código SVG";
+    const pasteMarkup = `<span aria-hidden="true">⤓</span> Colar código SVG`;
+    if (els.paste.innerHTML !== pasteMarkup) els.paste.innerHTML = pasteMarkup;
+    if (els.copyOutput.textContent !== "Copiar código SVG") els.copyOutput.textContent = "Copiar código SVG";
     document.querySelectorAll(".copy-button span").forEach(span => {
-      span.textContent = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+      const label = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+      if (span.textContent !== label) span.textContent = label;
     });
   }
 
   ensureTypeHint();
   ensureFamilyActions();
+  ensureSemanticUI();
   clarifyImportantActions();
 
-  els.svg.addEventListener("input", () => { updateVariantType(); updateFamilyActions(); });
-  els.name.addEventListener("input", () => { updateVariantType({ autoRename: false }); updateFamilyActions(); });
-  els.paste.addEventListener("click", () => setTimeout(() => { updateVariantType(); updateFamilyActions(); }, 100));
-  els.format.addEventListener("click", () => setTimeout(() => updateVariantType(), 0));
-  els.variantTabs.addEventListener("click", () => setTimeout(() => updateVariantType({ autoRename: false }), 0));
-  els.addVariant.addEventListener("click", () => setTimeout(() => updateVariantType(), 0));
+  els.svg.addEventListener("input", () => { updateVariantType(); updateFamilyActions(); updateSemanticCheck(); });
+  els.name.addEventListener("input", () => { updateVariantType({ autoRename: false }); updateFamilyActions(); updateSemanticCheck(); });
+  els.paste.addEventListener("click", () => setTimeout(() => { updateVariantType(); updateFamilyActions(); updateSemanticCheck(); }, 100));
+  els.format.addEventListener("click", () => setTimeout(() => { updateVariantType(); updateSemanticCheck(); }, 0));
+  els.variantTabs.addEventListener("click", () => setTimeout(() => { updateVariantType({ autoRename: false }); updateSemanticCheck(); }, 0));
+  els.addVariant.addEventListener("click", () => setTimeout(() => { updateVariantType(); updateSemanticCheck(); }, 0));
 
-  const dialogObserver = new MutationObserver(() => updateFamilyActions());
   const duplicateDialog = document.getElementById("duplicateConfirmDialog");
-  if (duplicateDialog) dialogObserver.observe(duplicateDialog, { attributes: true, attributeFilter: ["open"] });
+  if (duplicateDialog) {
+    const dialogObserver = new MutationObserver(() => updateFamilyActions());
+    dialogObserver.observe(duplicateDialog, { attributes: true, attributeFilter: ["open"] });
+  }
 
   const originalOpenEditorForTypes = openEditor;
   openEditor = function(id = null) {
@@ -201,10 +295,11 @@
     setTimeout(() => {
       updateVariantType({ autoRename: false });
       updateFamilyActions();
+      updateSemanticCheck();
       clarifyImportantActions();
     }, 0);
   };
 
-  const actionObserver = new MutationObserver(clarifyImportantActions);
+  const actionObserver = new MutationObserver(() => clarifyImportantActions());
   actionObserver.observe(els.grid, { childList: true, subtree: true });
 })();
