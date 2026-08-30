@@ -111,6 +111,22 @@
     });
   }
 
+  function loadVariantIntelligence() {
+    if (!document.querySelector('link[data-symbol-intelligence="true"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "./intelligence.css";
+      link.dataset.symbolIntelligence = "true";
+      document.head.appendChild(link);
+    }
+    if (!document.querySelector('script[data-symbol-intelligence="true"]')) {
+      const script = document.createElement("script");
+      script.src = "./variant-intelligence.js";
+      script.dataset.symbolIntelligence = "true";
+      document.body.appendChild(script);
+    }
+  }
+
   ensureDuplicateUI();
   els.save.addEventListener("click", interceptDuplicateSave, true);
   els.name.addEventListener("input", updateDuplicateWarning);
@@ -133,4 +149,5 @@
   const gridObserver = new MutationObserver(clarifyCopyButtons);
   gridObserver.observe(els.grid, { childList: true, subtree: true });
   clarifyCopyButtons();
+  loadVariantIntelligence();
 })();
