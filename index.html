@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Símbolos" />
+  <meta name="description" content="Biblioteca pessoal de símbolos SVG." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>Símbolos</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Biblioteca SVG</p>
+        <h1>Símbolos</h1>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-button" id="libraryButton" type="button" aria-label="Opções da biblioteca" title="Opções da biblioteca">
+          <span aria-hidden="true">•••</span>
+        </button>
+        <button class="add-button" id="addButton" type="button" aria-label="Adicionar símbolo">
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="search-section" aria-label="Pesquisar símbolos">
+      <div class="search-field">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></svg>
+        <input id="searchInput" type="search" placeholder="Buscar símbolo" autocomplete="off" />
+        <button id="clearSearchButton" class="clear-search" type="button" aria-label="Limpar busca">×</button>
+      </div>
+      <div class="library-meta">
+        <span id="symbolCount">0 símbolos</span>
+        <span id="storageBadge">Salvo neste aparelho</span>
+      </div>
+    </section>
+
+    <main>
+      <section id="symbolGrid" class="symbol-grid" aria-live="polite"></section>
+      <section id="emptyState" class="empty-state">
+        <div class="empty-icon" aria-hidden="true">◇</div>
+        <h2>Sua biblioteca está vazia</h2>
+        <p>Cole um SVG, visualize, normalize e salve para copiar quando precisar.</p>
+        <button id="emptyAddButton" class="primary-button" type="button">Adicionar primeiro símbolo</button>
+      </section>
+      <section id="noResultsState" class="empty-state" hidden>
+        <div class="empty-icon" aria-hidden="true">⌕</div>
+        <h2>Nenhum símbolo encontrado</h2>
+        <p>Tente outro nome ou limpe a busca.</p>
+      </section>
+    </main>
+  </div>
+
+  <div id="libraryMenu" class="popover" hidden>
+    <button id="exportButton" type="button">Exportar biblioteca</button>
+    <button id="importButton" type="button">Importar biblioteca</button>
+    <button id="aboutStorageButton" type="button">Sobre o armazenamento</button>
+  </div>
+  <input id="importFileInput" type="file" accept="application/json,.json" hidden />
+
+  <dialog id="editorDialog" class="sheet-dialog">
+    <form method="dialog" class="sheet" id="editorForm">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <button class="text-button" id="cancelEditorButton" type="button">Cancelar</button>
+        <h2 id="editorTitle">Novo símbolo</h2>
+        <button class="text-button strong" id="saveSymbolButton" type="button">Salvar</button>
+      </div>
+
+      <div class="sheet-scroll">
+        <section class="preview-card">
+          <div id="svgPreview" class="svg-preview" aria-label="Pré-visualização do símbolo"></div>
+          <div class="preview-toolbar">
+            <label class="preview-color-label" for="previewColorInput">Prévia</label>
+            <input id="previewColorInput" type="color" value="#111111" aria-label="Cor da pré-visualização" />
+          </div>
+          <p id="previewStatus" class="preview-status">Cole um SVG para visualizar.</p>
+        </section>
+
+        <section class="form-card">
+          <label class="field-label" for="nameInput">Nome</label>
+          <input id="nameInput" class="text-input" type="text" maxlength="80" placeholder="Ex.: clock.arrow.circlepath" autocomplete="off" />
+
+          <label class="field-label field-spaced" for="svgInput">Código SVG</label>
+          <textarea id="svgInput" class="code-input" rows="10" placeholder="Cole aqui o código completo <svg>…</svg>" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+          <div class="inline-actions">
+            <button id="pasteButton" class="secondary-button" type="button">Colar</button>
+            <button id="formatButton" class="secondary-button" type="button">Formatar</button>
+          </div>
+        </section>
+
+        <section class="form-card">
+          <div class="section-heading">
+            <div>
+              <h3>Adaptação para apps</h3>
+              <p>O original fica preservado; estas opções alteram apenas a versão salva para copiar.</p>
+            </div>
+          </div>
+
+          <fieldset class="setting-group">
+            <legend>Cor</legend>
+            <label class="choice-row recommended">
+              <input type="radio" name="colorMode" value="currentColor" checked />
+              <span><strong>currentColor</strong><small>Recomendado · herda a cor do app</small></span>
+              <span class="recommended-pill">Recomendado</span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="colorMode" value="original" />
+              <span><strong>Original</strong><small>Mantém as cores do SVG</small></span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="colorMode" value="fixed" />
+              <span><strong>Cor fixa</strong><small>Substitui cores sólidas por uma cor escolhida</small></span>
+              <input id="fixedColorInput" class="compact-color" type="color" value="#111111" aria-label="Cor fixa" />
+            </label>
+          </fieldset>
+
+          <fieldset class="setting-group">
+            <legend>Tamanho de saída</legend>
+            <label class="choice-row recommended">
+              <input type="radio" name="sizeMode" value="24" checked />
+              <span><strong>24 × 24</strong><small>Padrão prático para interfaces</small></span>
+              <span class="recommended-pill">Recomendado</span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="sizeMode" value="1em" />
+              <span><strong>1em × 1em</strong><small>Escala junto com o texto</small></span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="sizeMode" value="original" />
+              <span><strong>Original</strong><small>Mantém width e height recebidos</small></span>
+            </label>
+          </fieldset>
+
+          <div id="strokeControls" class="setting-group stroke-controls" hidden>
+            <div class="slider-heading">
+              <span><strong>Peso do traço</strong><small id="strokeHint">Aplicável a SVGs com stroke</small></span>
+              <output id="strokeWidthOutput">1.5</output>
+            </div>
+            <input id="strokeWidthInput" type="range" min="0.5" max="4" step="0.25" value="1.5" />
+            <button id="restoreStrokeButton" class="link-button" type="button">Restaurar peso original</button>
+          </div>
+
+          <label class="switch-row">
+            <span><strong>Limpeza técnica</strong><small>Remove scripts, eventos, comentários e metadados inseguros sem alterar o desenho.</small></span>
+            <input id="cleanupInput" type="checkbox" checked />
+          </label>
+        </section>
+
+        <section class="form-card analysis-card">
+          <h3>Análise do SVG</h3>
+          <div id="analysisChips" class="analysis-chips"></div>
+          <p id="analysisText">Cole um SVG para ver a análise.</p>
+        </section>
+
+        <section class="form-card output-card">
+          <div class="section-heading output-heading">
+            <div>
+              <h3>Código final</h3>
+              <p>É este código que o botão Copiar usará.</p>
+            </div>
+            <button id="copyOutputButton" class="secondary-button" type="button">Copiar</button>
+          </div>
+          <pre id="outputCode" class="output-code"><code></code></pre>
+        </section>
+
+        <button id="deleteSymbolButton" class="danger-button" type="button" hidden>Excluir símbolo</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="infoDialog" class="alert-dialog">
+    <div class="alert-card">
+      <h2>Onde seus símbolos ficam?</h2>
+      <p>Esta versão salva a biblioteca no armazenamento local do navegador deste aparelho. O site hospedado no GitHub Pages não consegue gravar novos símbolos diretamente no seu repositório sem uma autenticação adicional.</p>
+      <p>Use <strong>Exportar biblioteca</strong> como backup e <strong>Importar biblioteca</strong> para restaurar ou mover seus símbolos para outro aparelho.</p>
+      <button id="closeInfoButton" class="primary-button" type="button">Entendi</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <template id="symbolCardTemplate">
+    <article class="symbol-card">
+      <button class="symbol-main" type="button" aria-label="Editar símbolo">
+        <div class="card-preview"></div>
+        <div class="card-info">
+          <h2></h2>
+          <p class="card-meta"></p>
+        </div>
+      </button>
+      <button class="copy-button" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span>Copiar</span>
+      </button>
+    </article>
+  </template>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
