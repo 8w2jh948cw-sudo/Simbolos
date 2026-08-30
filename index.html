@@ -81,7 +81,7 @@
 
           <label class="field-label field-spaced" for="svgInput">Código SVG desta versão</label>
           <textarea id="svgInput" class="code-input" rows="10" placeholder="Cole aqui o código completo <svg>…</svg>" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-          <div class="inline-actions"><button id="pasteButton" class="secondary-button" type="button">Colar</button><button id="formatButton" class="secondary-button" type="button">Formatar</button></div>
+          <div class="inline-actions"><button id="pasteButton" class="secondary-button paste-button" type="button">Colar SVG</button><button id="formatButton" class="secondary-button" type="button">Formatar</button></div>
         </section>
 
         <section class="form-card">
@@ -115,6 +115,10 @@
 
         <button id="deleteVariantButton" class="danger-button secondary-danger" type="button">Excluir esta versão</button>
         <button id="deleteSymbolButton" class="danger-button" type="button" hidden>Excluir símbolo inteiro</button>
+      </div>
+
+      <div class="editor-save-bar">
+        <button class="editor-save-button" type="button" onclick="document.getElementById('saveSymbolButton').click()">Salvar símbolo</button>
       </div>
     </form>
   </dialog>
