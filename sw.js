@@ -1,5 +1,5 @@
-const CACHE = "simbolos-v3";
-const ASSETS = ["./", "./index.html", "./styles.css", "./variants.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "simbolos-v4";
+const ASSETS = ["./", "./index.html", "./styles.css", "./variants.css", "./app.js", "./enhancements.js", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
 self.addEventListener("fetch", event => {
