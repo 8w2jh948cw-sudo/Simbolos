@@ -14,6 +14,7 @@
   <link rel="apple-touch-icon" href="./icon.svg" />
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./variants.css" />
+  <link rel="stylesheet" href="./intelligence.css" />
   <title>Símbolos</title>
 </head>
 <body>
@@ -56,7 +57,7 @@
   <dialog id="editorDialog" class="sheet-dialog">
     <form method="dialog" class="sheet" id="editorForm">
       <div class="sheet-header">
-        <button class="text-button" id="cancelEditorButton" type="button">Cancelar</button>
+        <button class="cancel-icon-button" id="cancelEditorButton" type="button" aria-label="Cancelar e fechar"><span aria-hidden="true">×</span></button>
         <h2 id="editorTitle">Novo símbolo</h2>
       </div>
 
@@ -68,7 +69,10 @@
         </section>
 
         <section class="form-card">
-          <label class="field-label" for="nameInput">Título do símbolo</label>
+          <div class="field-label-row">
+            <label class="field-label no-margin" for="nameInput">Título do símbolo</label>
+            <button id="pasteTitleButton" class="title-paste-button" type="button"><span aria-hidden="true">⤓</span> Colar título</button>
+          </div>
           <input id="nameInput" class="text-input" type="text" maxlength="80" placeholder="Ex.: clock.arrow.circlepath" autocomplete="off" />
 
           <div class="variants-heading field-spaced"><div><span class="field-label no-margin">Versões</span><small>Preenchido, contorno ou qualquer alternativa.</small></div><button id="addVariantButton" class="secondary-button" type="button">+ Versão</button></div>
@@ -138,5 +142,6 @@
 
   <script src="./app.js" defer></script>
   <script src="./enhancements.js" defer></script>
+  <script src="./variant-intelligence.js" defer></script>
 </body>
 </html>
