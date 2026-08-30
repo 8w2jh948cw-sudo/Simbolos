@@ -96,6 +96,12 @@
     document.getElementById("duplicateConfirmDialog").showModal();
   }
 
+  function clarifyCopyButtons() {
+    document.querySelectorAll(".copy-button span").forEach(span => {
+      span.textContent = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+    });
+  }
+
   ensureDuplicateUI();
   els.save.addEventListener("click", interceptDuplicateSave, true);
   els.name.addEventListener("input", updateDuplicateWarning);
@@ -103,6 +109,8 @@
   els.variantLabel.addEventListener("input", updateDuplicateWarning);
   els.variantTabs.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
   els.addVariant.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
+  els.paste.addEventListener("click", () => setTimeout(updateDuplicateWarning, 80));
+  els.format.addEventListener("click", () => setTimeout(updateDuplicateWarning, 0));
 
   const originalOpenEditor = openEditor;
   openEditor = function(id = null) {
@@ -110,13 +118,7 @@
     setTimeout(updateDuplicateWarning, 0);
   };
 
-  const originalRender = render;
-  render = function() {
-    originalRender();
-    document.querySelectorAll(".copy-button span").forEach(span => {
-      span.textContent = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
-    });
-  };
-
-  render();
+  const gridObserver = new MutationObserver(clarifyCopyButtons);
+  gridObserver.observe(els.grid, { childList: true, subtree: true });
+  clarifyCopyButtons();
 })();
