@@ -103,10 +103,11 @@
 
   function clarifyCopyButtons() {
     document.querySelectorAll(".copy-button span").forEach(span => {
-      span.textContent = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+      const label = span.textContent.includes("▾") ? "Copiar código SVG ▾" : "Copiar código SVG";
+      if (span.textContent !== label) span.textContent = label;
     });
     document.querySelectorAll("#copyVariantsList button > span:last-child").forEach(span => {
-      span.textContent = "Copiar código";
+      if (span.textContent !== "Copiar código") span.textContent = "Copiar código";
     });
   }
 
