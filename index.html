@@ -58,13 +58,12 @@
       <div class="sheet-header">
         <button class="text-button" id="cancelEditorButton" type="button">Cancelar</button>
         <h2 id="editorTitle">Novo símbolo</h2>
-        <button class="text-button strong" id="saveSymbolButton" type="button">Salvar</button>
       </div>
 
       <div class="sheet-scroll">
         <section class="preview-card">
           <div id="svgPreview" class="svg-preview" aria-label="Pré-visualização do símbolo"></div>
-          <div class="preview-toolbar"><span id="previewVariantName">Padrão</span><label class="preview-color-label" for="previewColorInput">Cor da prévia</label><input id="previewColorInput" type="color" value="#111111" aria-label="Cor da pré-visualização" /></div>
+          <div class="preview-toolbar"><span id="previewVariantName">Padrão</span><div class="preview-color-control"><label class="preview-color-label" for="previewColorInput">Cor da prévia</label><input id="previewColorInput" type="color" value="#111111" aria-label="Cor da pré-visualização" /></div></div>
           <p id="previewStatus" class="preview-status">Cole um SVG para visualizar.</p>
         </section>
 
@@ -81,7 +80,7 @@
 
           <label class="field-label field-spaced" for="svgInput">Código SVG desta versão</label>
           <textarea id="svgInput" class="code-input" rows="10" placeholder="Cole aqui o código completo <svg>…</svg>" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-          <div class="inline-actions"><button id="pasteButton" class="secondary-button paste-button" type="button">Colar SVG</button><button id="formatButton" class="secondary-button" type="button">Formatar</button></div>
+          <div class="inline-actions"><button id="pasteButton" class="secondary-button paste-button" type="button"><span aria-hidden="true">⤓</span> Colar SVG</button><button id="formatButton" class="secondary-button" type="button">Formatar</button></div>
         </section>
 
         <section class="form-card">
@@ -118,7 +117,7 @@
       </div>
 
       <div class="editor-save-bar">
-        <button class="editor-save-button" type="button" onclick="document.getElementById('saveSymbolButton').click()">Salvar símbolo</button>
+        <button id="saveSymbolButton" class="editor-save-button" type="button"><span class="save-check" aria-hidden="true">✓</span><span>Salvar</span></button>
       </div>
     </form>
   </dialog>
