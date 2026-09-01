@@ -13,7 +13,7 @@ for(const f of required){
   if(!fs.existsSync(f)||fs.statSync(f).size===0) fail(`arquivo obrigatório ausente/vazio: ${f}`);
 }
 const read=f=>fs.readFileSync(f,'utf8');
-const scriptBodies=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).join('\n');
+const scriptBodies=html=>[...html.matchAll(/<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).join('\n');
 const importsApp=html=>/<script\b[^>]*\bsrc\s*=\s*["'][^"']*app\.js(?:[?"'])/i.test(html);
 const hasDestructiveStorageCall=html=>{
   const js=scriptBodies(html);
@@ -24,10 +24,12 @@ const pngSize=file=>{
   if(b.length<24||b.toString('hex',0,8)!=='89504e470d0a1a0a') return null;
   return [b.readUInt32BE(16),b.readUInt32BE(20)];
 };
+const syntaxCheck=(name,code)=>{try{new Function(code);}catch(e){fail(`${name}: erro de sintaxe JavaScript: ${e.message}`);}};
 
 const menu=read('menu.html');
 if(!menu.includes('Central de Diagnóstico')) fail('menu.html não contém o menu real');
-if(/url=\.\/menu\.html|location\.replace\(['"]\.\/menu\.html/.test(menu)) fail('menu.html contém redirect para ele mesmo');
+if(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh/i.test(menu)||/location\s*\.\s*(?:replace|assign)\s*\(/.test(scriptBodies(menu))) fail('menu.html não pode redirecionar');
+if(menu.includes('class="app-shell"')||menu.includes("class='app-shell'")) fail('menu.html não pode conter o shell do app');
 if(importsApp(menu)) fail('menu.html não pode importar app.js');
 
 const menuIndex=read('menu/index.html');
@@ -67,6 +69,7 @@ if(fs.readFileSync('icons/apple-touch-icon.png').equals(fs.readFileSync('beta/ic
 for(const f of ['recover.html','beta/recover.html']){
   const t=read(f);
   if(hasDestructiveStorageCall(t)) fail(`${f}: recuperação contém chamada destrutiva de storage`);
+  if(!scriptBodies(t).includes('1800')) fail(`${f}: recuperação precisa de timeout`);
 }
 for(const f of ['safe.html','beta/safe.html']){
   if(importsApp(read(f))) fail(`${f}: modo seguro não pode importar app.js`);
@@ -84,7 +87,12 @@ if(!guard.includes('Storage.prototype')||!guard.includes('serviceWorker')) fail(
 
 const manager=read('beta/manage.html');
 const managerJs=scriptBodies(manager);
-if(!managerJs.includes("simbolos.beta.library.v2")) fail('gerenciador Beta não aponta para base Beta');
+if(!managerJs.includes('simbolos.beta.library.v2')) fail('gerenciador Beta não aponta para base Beta');
 if(/localStorage\s*\.\s*removeItem\s*\(\s*OFF\s*\)/.test(managerJs)) fail('gerenciador Beta pode apagar a base Oficial');
+
+const jsFiles=['config.js','boot.js','runtime-guard.js','core-safety-patch.js','app.js','enhancements.js','clipboard-polish.js','variant-intelligence.js','sw.js','beta/config.js','beta/boot.js','beta/runtime-guard.js','beta/core-safety-patch.js','beta/app.js','beta/enhancements.js','beta/clipboard-polish.js','beta/variant-intelligence.js','beta/sw.js'];
+for(const f of jsFiles) syntaxCheck(f,read(f));
+const htmlWithInline=['menu.html','menu/index.html','diagnostico/index.html','launch.html','recover.html','safe.html','beta/launch.html','beta/recover.html','beta/safe.html','beta/manage.html'];
+for(const f of htmlWithInline){const js=scriptBodies(read(f));if(js.trim())syntaxCheck(`${f} <script>`,js);}
 
 console.log(process.exitCode?'Release inválida':'Release validada com sucesso.');
