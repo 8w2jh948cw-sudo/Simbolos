@@ -19,33 +19,38 @@ let toastTimer = null;
 
 function uid(){ return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function defaultOptions(){ return { colorMode:"currentColor", sizeMode:"24", fixedColor:"#111111", cleanup:true, strokeOverride:null }; }
+function normalizeOptions(value){ const source=value&&typeof value==="object"&&!Array.isArray(value)?value:{},stroke=Number(source.strokeOverride);return {colorMode:["currentColor","original","fixed"].includes(source.colorMode)?source.colorMode:"currentColor",sizeMode:["24","1em","original"].includes(source.sizeMode)?source.sizeMode:"24",fixedColor:typeof source.fixedColor==="string"&&/^#[0-9a-f]{6}$/i.test(source.fixedColor)?source.fixedColor:"#111111",cleanup:source.cleanup!==false,strokeOverride:source.strokeOverride!=null&&Number.isFinite(stroke)?Math.min(4,Math.max(.5,stroke)):null}; }
 function newVariant(label="Padrão"){ return { id:uid(), label, originalSvg:"", finalSvg:"", options:defaultOptions(), createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() }; }
 function normalizeItem(item){
+  if(!item||typeof item!=="object"||Array.isArray(item))return null;
   if (Array.isArray(item.variants) && item.variants.length) {
-    item.variants = item.variants.map(v => ({ id:v.id||uid(), label:v.label||"Padrão", originalSvg:v.originalSvg||"", finalSvg:v.finalSvg||"", options:{...defaultOptions(),...(v.options||{})}, createdAt:v.createdAt||new Date().toISOString(), updatedAt:v.updatedAt||new Date().toISOString() }));
+    item.variants = item.variants.filter(v=>v&&typeof v==="object"&&!Array.isArray(v)).map(v => ({ id:typeof v.id==="string"&&v.id?v.id:uid(), label:typeof v.label==="string"&&v.label.trim()?v.label.trim().slice(0,40):"Padrão", originalSvg:typeof v.originalSvg==="string"?v.originalSvg:"", finalSvg:typeof v.finalSvg==="string"?v.finalSvg:"", options:normalizeOptions(v.options), createdAt:typeof v.createdAt==="string"?v.createdAt:new Date().toISOString(), updatedAt:typeof v.updatedAt==="string"?v.updatedAt:new Date().toISOString() }));
+    if(!item.variants.length)return null;
+    item.id=typeof item.id==="string"&&item.id?item.id:uid();
+    item.name=typeof item.name==="string"&&item.name.trim()?item.name.trim().slice(0,80):"Sem título";
+    item.createdAt=typeof item.createdAt==="string"?item.createdAt:new Date().toISOString();
+    item.updatedAt=typeof item.updatedAt==="string"?item.updatedAt:new Date().toISOString();
     item.defaultVariantId = item.variants.some(v=>v.id===item.defaultVariantId) ? item.defaultVariantId : item.variants[0].id;
     return item;
   }
   if (typeof item.originalSvg === "string") {
-    const v = { id:uid(), label:"Padrão", originalSvg:item.originalSvg, finalSvg:item.finalSvg||item.originalSvg, options:{...defaultOptions(),...(item.options||{})}, createdAt:item.createdAt||new Date().toISOString(), updatedAt:item.updatedAt||new Date().toISOString() };
-    return { id:item.id||uid(), name:item.name||"Sem título", variants:[v], defaultVariantId:v.id, createdAt:item.createdAt||new Date().toISOString(), updatedAt:item.updatedAt||new Date().toISOString() };
+    const v = { id:uid(), label:"Padrão", originalSvg:item.originalSvg, finalSvg:typeof item.finalSvg==="string"?item.finalSvg:item.originalSvg, options:normalizeOptions(item.options), createdAt:typeof item.createdAt==="string"?item.createdAt:new Date().toISOString(), updatedAt:typeof item.updatedAt==="string"?item.updatedAt:new Date().toISOString() };
+    return { id:typeof item.id==="string"&&item.id?item.id:uid(), name:typeof item.name==="string"&&item.name.trim()?item.name.trim().slice(0,80):"Sem título", variants:[v], defaultVariantId:v.id, createdAt:v.createdAt, updatedAt:v.updatedAt };
   }
   return null;
 }
 function loadItems(){
-  try {
-    let raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (!Array.isArray(raw)) raw = JSON.parse(localStorage.getItem(LEGACY_KEY) || "[]");
-    const normalized = raw.map(normalizeItem).filter(Boolean);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return normalized;
-  } catch { return []; }
+  const read=key=>{try{const value=JSON.parse(localStorage.getItem(key)||"null");return Array.isArray(value)?value:null;}catch{return null;}};
+  const current=read(STORAGE_KEY),legacy=current===null?read(LEGACY_KEY):null,raw=current??legacy??[];
+  const normalized=raw.map(normalizeItem).filter(Boolean);
+  if(current===null&&legacy!==null){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(normalized));}catch{}}
+  return normalized;
 }
-function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+function persist(nextItems=items){ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(nextItems));return true;}catch(error){console.warn("Não foi possível salvar a biblioteca:",error);return false;} }
 function showToast(message){ clearTimeout(toastTimer); els.toast.textContent=message; els.toast.hidden=false; toastTimer=setTimeout(()=>els.toast.hidden=true,1800); }
 async function copyText(text){
   if (!text) throw new Error("empty");
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  if (navigator.clipboard?.writeText) { try{await navigator.clipboard.writeText(text);return;}catch{} }
   const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
   const ok=document.execCommand("copy"); ta.remove(); if(!ok) throw new Error("copy");
 }
@@ -55,18 +60,21 @@ function parseSvg(code){
   const root=doc.documentElement; if(!root||root.localName.toLowerCase()!=="svg") return {ok:false,error:"O código precisa começar com <svg>."};
   return {ok:true,root};
 }
+function hasUnsafeUrl(value){ return [...String(value||"").matchAll(/url\s*\(\s*(['"]?)(.*?)\1\s*\)/gi)].some(match=>!match[2].trim().startsWith("#")); }
 function sanitize(root,cleanup=true){
-  const out=root.cloneNode(true); out.querySelectorAll("script,foreignObject,iframe,object,embed,audio,video").forEach(el=>el.remove());
+  const out=root.cloneNode(true); out.querySelectorAll("script,style,foreignObject,iframe,object,embed,audio,video,animate,animateMotion,animateTransform,set,discard,mpath").forEach(el=>el.remove());
   if(cleanup) out.querySelectorAll("metadata,title,desc").forEach(el=>el.remove());
   [out,...out.querySelectorAll("*")].forEach(el=>[...el.attributes].forEach(attr=>{
-    const n=attr.name.toLowerCase(),v=attr.value.trim().toLowerCase();
+    const n=attr.name.toLowerCase(),v=String(attr.value||"").trim();
     if(n.startsWith("on")) el.removeAttribute(attr.name);
-    if((n==="href"||n.endsWith(":href"))&&(v.startsWith("javascript:")||v.startsWith("data:text/html"))) el.removeAttribute(attr.name);
+    if((n==="href"||n.endsWith(":href"))&&!v.startsWith("#")) el.removeAttribute(attr.name);
+    if(hasUnsafeUrl(v)) el.removeAttribute(attr.name);
     if(cleanup&&(n==="class"||n.startsWith("data-"))) el.removeAttribute(attr.name);
   }));
   return out;
 }
 function isSolidPaint(value){ if(!value)return false; const v=value.trim().toLowerCase(); return !["none","transparent","currentcolor","inherit","initial","unset"].includes(v)&&!v.startsWith("url("); }
+function styleProperty(el,name){ const match=String(el.getAttribute("style")||"").match(new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`,"i"));return match?match[1].trim():null; }
 function applyPaint(root,mode,fixedColor){
   if(mode==="original")return; const target=mode==="currentColor"?"currentColor":fixedColor;
   [root,...root.querySelectorAll("*")].forEach(el=>{
@@ -76,10 +84,10 @@ function applyPaint(root,mode,fixedColor){
   const nodes=[root,...root.querySelectorAll("*")]; if(!nodes.some(el=>el.hasAttribute("fill"))&&!nodes.some(el=>el.hasAttribute("stroke"))) root.setAttribute("fill",target);
 }
 function applySize(root,mode){ if(mode==="1em"){root.setAttribute("width","1em");root.setAttribute("height","1em");} else if(mode==="24"){root.setAttribute("width","24");root.setAttribute("height","24");} }
-function applyStroke(root,width){ if(width==null)return; [root,...root.querySelectorAll("*")].forEach(el=>{ const stroke=el.getAttribute("stroke"); if(stroke&&stroke.toLowerCase()!=="none") el.setAttribute("stroke-width",String(width)); }); }
+function applyStroke(root,width){ if(width==null)return; [root,...root.querySelectorAll("*")].forEach(el=>{ const stroke=el.getAttribute("stroke")||styleProperty(el,"stroke"); if(stroke&&stroke.toLowerCase()!=="none") el.setAttribute("stroke-width",String(width)); }); }
 function serializeSvg(root){ if(!root.hasAttribute("xmlns"))root.setAttribute("xmlns","http://www.w3.org/2000/svg"); return new XMLSerializer().serializeToString(root).replace(/></g,">\n<"); }
 function analyzeSvg(root){
-  const nodes=[root,...root.querySelectorAll("*")],fills=nodes.map(el=>el.getAttribute("fill")).filter(Boolean),strokes=nodes.map(el=>el.getAttribute("stroke")).filter(v=>v&&v.toLowerCase()!=="none"),widths=nodes.map(el=>Number(el.getAttribute("stroke-width"))).filter(Number.isFinite);
+  const nodes=[root,...root.querySelectorAll("*")],fills=nodes.map(el=>el.getAttribute("fill")||styleProperty(el,"fill")).filter(Boolean),strokes=nodes.map(el=>el.getAttribute("stroke")||styleProperty(el,"stroke")).filter(v=>v&&v.toLowerCase()!=="none"),widths=nodes.map(el=>el.getAttribute("stroke-width")||styleProperty(el,"stroke-width")).filter(v=>v!=null&&v!=="").map(Number).filter(Number.isFinite);
   return { paths:root.querySelectorAll("path").length, viewBox:root.getAttribute("viewBox")||"sem viewBox", hasStroke:strokes.length>0, usesCurrent:[...fills,...strokes].some(v=>v.toLowerCase()==="currentcolor"), hasMultiColor:new Set([...fills,...strokes].filter(isSolidPaint).map(v=>v.toLowerCase())).size>1, strokeWidth:widths[0]||1.5 };
 }
 function transformSvg(svg,options){
@@ -121,7 +129,7 @@ function render(){
   els.count.textContent=`${items.length} ${items.length===1?"símbolo":"símbolos"}`; els.empty.hidden=items.length!==0; els.noResults.hidden=!(items.length>0&&filtered.length===0); els.grid.hidden=filtered.length===0; els.clearSearch.style.display=q?"grid":"none";
 }
 async function copyVariant(item,variant){ try{await copyText(variant.finalSvg||variant.originalSvg);showToast(`“${item.name} · ${variant.label}” copiado`);}catch{showToast("Não foi possível copiar");} }
-function openCopyChooser(item){ els.copyTitle.textContent=item.name; els.copyList.innerHTML=""; item.variants.forEach(v=>{ const b=document.createElement("button"); b.type="button"; b.innerHTML=`<span><strong>${v.label}</strong><small>${v.id===item.defaultVariantId?"Padrão · ":""}${v.options?.colorMode==="currentColor"?"currentColor":"SVG"}</small></span><span>Copiar</span>`; b.addEventListener("click",async()=>{await copyVariant(item,v);els.copyDialog.close();}); els.copyList.appendChild(b); }); els.copyDialog.showModal(); }
+function openCopyChooser(item){ els.copyTitle.textContent=item.name; els.copyList.innerHTML=""; item.variants.forEach(v=>{ const b=document.createElement("button"),details=document.createElement("span"),strong=document.createElement("strong"),small=document.createElement("small"),action=document.createElement("span"); b.type="button";strong.textContent=v.label;small.textContent=`${v.id===item.defaultVariantId?"Padrão · ":""}${v.options?.colorMode==="currentColor"?"currentColor":"SVG"}`;action.textContent="Copiar";details.append(strong,small);b.append(details,action);b.addEventListener("click",async()=>{await copyVariant(item,v);els.copyDialog.close();});els.copyList.appendChild(b); }); els.copyDialog.showModal(); }
 function openEditor(id=null){
   if(id){ const item=items.find(x=>x.id===id); if(!item)return; draft=clone(item); els.editorTitle.textContent=item.name; els.name.value=item.name; els.deleteSymbol.hidden=false; }
   else{ const v=newVariant("Padrão"); draft={id:uid(),name:"",variants:[v],defaultVariantId:v.id,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}; els.editorTitle.textContent="Novo símbolo"; els.name.value=""; els.deleteSymbol.hidden=true; }
@@ -133,13 +141,13 @@ function validateDraft(){
   for(const v of draft.variants){ if(!v.label.trim())return {ok:false,error:"Dê um nome para cada versão"}; const result=transformSvg(v.originalSvg,v.options); if(!result.ok)return {ok:false,error:`${v.label}: ${result.error}`}; v.finalSvg=result.output; }
   return {ok:true};
 }
-function saveDraft(){ const validation=validateDraft(); if(!validation.ok){validation.focus?.focus();showToast(validation.error);return;} draft.updatedAt=new Date().toISOString(); const exists=items.some(x=>x.id===draft.id); items=exists?items.map(x=>x.id===draft.id?draft:x):[draft,...items]; persist(); render(); const msg=exists?"Símbolo atualizado":"Símbolo adicionado"; closeEditor(); showToast(msg); }
+function saveDraft(){ const validation=validateDraft(); if(!validation.ok){validation.focus?.focus();showToast(validation.error);return;} draft.updatedAt=new Date().toISOString(); const exists=items.some(x=>x.id===draft.id),nextItems=exists?items.map(x=>x.id===draft.id?draft:x):[draft,...items]; if(!persist(nextItems)){showToast("Não foi possível salvar. Exporte um backup e libere espaço.");return;} items=nextItems;render();const msg=exists?"Símbolo atualizado":"Símbolo adicionado";closeEditor();showToast(msg); }
 function addVariant(){ stashCurrent(); const count=draft.variants.length+1,v=newVariant(`Versão ${count}`); draft.variants.push(v); loadVariantToUI(v.id); setTimeout(()=>{els.variantLabel.focus();els.variantLabel.select();},50); }
 function deleteActiveVariant(){ if(!draft||draft.variants.length<=1)return; const v=currentVariant(); if(!confirm(`Excluir a versão “${v.label}”?`))return; draft.variants=draft.variants.filter(x=>x.id!==v.id); if(draft.defaultVariantId===v.id)draft.defaultVariantId=draft.variants[0].id; loadVariantToUI(draft.variants[0].id); }
-function deleteWholeSymbol(){ if(!draft||!items.some(x=>x.id===draft.id))return; if(!confirm(`Excluir “${draft.name}” e todas as versões?`))return; items=items.filter(x=>x.id!==draft.id);persist();render();closeEditor();showToast("Símbolo excluído"); }
+function deleteWholeSymbol(){ if(!draft||!items.some(x=>x.id===draft.id))return; if(!confirm(`Excluir “${draft.name}” e todas as versões?`))return; const nextItems=items.filter(x=>x.id!==draft.id);if(!persist(nextItems)){showToast("Não foi possível atualizar a biblioteca");return;}items=nextItems;render();closeEditor();showToast("Símbolo excluído"); }
 async function pasteSvg(){ try{ if(!navigator.clipboard?.readText)throw new Error(); els.svg.value=await navigator.clipboard.readText();updateEditor(); }catch{showToast("Cole o SVG manualmente neste campo");els.svg.focus();} }
 function exportLibrary(){ const data=JSON.stringify({app:"Simbolos",version:2,exportedAt:new Date().toISOString(),symbols:items},null,2),blob=new Blob([data],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`simbolos-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);els.libraryMenu.hidden=true; }
-function importLibrary(file){ const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(String(reader.result)),incoming=Array.isArray(data)?data:data.symbols;if(!Array.isArray(incoming))throw new Error(); const normalized=incoming.map(normalizeItem).filter(Boolean),byId=new Map(items.map(x=>[x.id,x])); normalized.forEach(x=>byId.set(x.id,x));items=[...byId.values()];persist();render();showToast(`${normalized.length} símbolo${normalized.length===1?"":"s"} importado${normalized.length===1?"":"s"}`);}catch{showToast("Backup inválido");} els.importFile.value="";};reader.readAsText(file); }
+function importLibrary(file){ const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(String(reader.result)),incoming=Array.isArray(data)?data:data.symbols;if(!Array.isArray(incoming))throw new Error(); const normalized=incoming.map(normalizeItem).filter(Boolean);if(incoming.length&&!normalized.length)throw new Error();const byId=new Map(items.map(x=>[x.id,x]));normalized.forEach(x=>byId.set(x.id,x));const nextItems=[...byId.values()];if(!persist(nextItems)){showToast("Sem espaço para importar. Exporte um backup e libere espaço.");return;}items=nextItems;render();showToast(`${normalized.length} símbolo${normalized.length===1?"":"s"} importado${normalized.length===1?"":"s"}`);}catch{showToast("Backup inválido");}finally{els.importFile.value="";}};reader.onerror=()=>{els.importFile.value="";showToast("Não foi possível ler o arquivo");};reader.readAsText(file); }
 
 els.add.addEventListener("click",()=>openEditor()); els.emptyAdd.addEventListener("click",()=>openEditor()); els.cancel.addEventListener("click",closeEditor); els.save.addEventListener("click",saveDraft);
 els.name.addEventListener("input",()=>{if(draft)els.editorTitle.textContent=els.name.value.trim()||"Novo símbolo";}); els.variantLabel.addEventListener("input",()=>{const v=currentVariant();if(v){v.label=els.variantLabel.value;renderVariantTabs();els.previewVariantName.textContent=els.variantLabel.value||"Sem nome";}});

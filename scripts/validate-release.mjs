@@ -44,6 +44,7 @@ const betaIndex=read('beta/index.html');
 if(!betaIndex.includes('./icons/apple-touch-icon.png')) fail('Beta sem apple-touch-icon PNG próprio');
 if(!betaIndex.includes('./boot.js')) fail('Beta sem boot resiliente');
 if(importsApp(betaIndex)) fail('beta/app.js não deve ser carregado diretamente pelo HTML');
+if(!betaIndex.includes('href="../diagnostico/"')||!betaIndex.includes('href="../menu.html"')) fail('Beta contém links de fallback fora do escopo correto');
 
 const betaCfg=read('beta/config.js');
 if(!betaCfg.includes('simbolos.beta.library.v2')) fail('Beta não usa storage próprio');
@@ -94,5 +95,22 @@ const jsFiles=['config.js','boot.js','runtime-guard.js','core-safety-patch.js','
 for(const f of jsFiles) syntaxCheck(f,read(f));
 const htmlWithInline=['menu.html','menu/index.html','diagnostico/index.html','launch.html','recover.html','safe.html','beta/launch.html','beta/recover.html','beta/safe.html','beta/manage.html'];
 for(const f of htmlWithInline){const js=scriptBodies(read(f));if(js.trim())syntaxCheck(`${f} <script>`,js);}
+
+for(const f of ['app.js','beta/app.js']){
+  const code=read(f);
+  if(code.includes('b.innerHTML=`<span><strong>${v.label}')) fail(`${f}: seletor de variantes injeta rótulos como HTML`);
+  if(!code.includes('strong.textContent=v.label')) fail(`${f}: seletor de variantes precisa usar textContent`);
+  if(!code.includes('hasUnsafeUrl')||!code.includes('script,style,foreignObject')) fail(`${f}: sanitização SVG incompleta`);
+  if(code.includes('if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text)')) fail(`${f}: cópia não possui fallback após falha da Clipboard API`);
+  if(code.includes('nodes.map(el=>Number(el.getAttribute("stroke-width")))')) fail(`${f}: análise de stroke-width trata atributos ausentes como zero`);
+  if(!code.includes('function persist(nextItems=items)')) fail(`${f}: persistência não aceita atualização atômica`);
+}
+for(const f of ['enhancements.js','beta/enhancements.js']){
+  if(!read(f).includes('const escapeHtml')) fail(`${f}: avisos de duplicata não escapam conteúdo do usuário`);
+}
+for(const f of ['app.js','core-safety-patch.js','enhancements.js','variant-intelligence.js']){
+  const betaFile=`beta/${f}`;
+  if(!fs.readFileSync(f).equals(fs.readFileSync(betaFile))) fail(`${betaFile}: motor Beta divergiu do Oficial em ${f}`);
+}
 
 console.log(process.exitCode?'Release inválida':'Release validada com sucesso.');

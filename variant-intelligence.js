@@ -125,7 +125,8 @@
       return;
     }
 
-    const existingCodes = new Set(target.variants.map(v => String(v.originalSvg || "").trim()));
+    const updatedTarget = clone(target);
+    const existingCodes = new Set(updatedTarget.variants.map(v => String(v.originalSvg || "").trim()));
     const incoming = draft.variants.filter(v => !existingCodes.has(String(v.originalSvg || "").trim()));
     if (!incoming.length) {
       showToast("Esse código SVG já existe nesta família");
@@ -135,11 +136,16 @@
     incoming.forEach(variant => {
       const copy = clone(variant);
       copy.id = uid();
-      if (isAutoLabel(copy.label)) copy.label = detectVariantType(copy.originalSvg, target.name).type;
-      target.variants.push(copy);
+      if (isAutoLabel(copy.label)) copy.label = detectVariantType(copy.originalSvg, updatedTarget.name).type;
+      updatedTarget.variants.push(copy);
     });
-    target.updatedAt = new Date().toISOString();
-    persist();
+    updatedTarget.updatedAt = new Date().toISOString();
+    const nextItems = items.map(item => item.id === updatedTarget.id ? updatedTarget : item);
+    if (!persist(nextItems)) {
+      showToast("Não foi possível salvar. Exporte um backup e libere espaço.");
+      return;
+    }
+    items = nextItems;
     render();
     document.getElementById("duplicateConfirmDialog")?.close();
     closeEditor();
@@ -181,9 +187,9 @@
 
   function normalizeWords(value) {
     return String(value || "")
+      .replace(/([a-zà-öø-ÿ])([A-ZÀ-ÖØ-Þ])/g, "$1 $2")
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .replace(/([a-z])([A-Z])/g, "$1 $2")
       .replace(/[^a-z0-9]+/g, " ")
       .trim()
       .split(/\s+/)

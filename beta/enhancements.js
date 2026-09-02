@@ -3,6 +3,7 @@
 
   const normalizeTitle = value => String(value || "").trim().toLocaleLowerCase("pt-BR");
   const normalizeSvg = value => String(value || "").trim();
+  const escapeHtml = value => String(value || "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);
 
   function collectDuplicates() {
     if (!draft) return { title: [], svg: [] };
@@ -39,10 +40,10 @@
   function messagesFor(duplicates) {
     const parts = [];
     if (duplicates.title.length) {
-      parts.push(`<p><strong>Título já existente.</strong> Encontrado em ${duplicates.title.map(name => `“${name}”`).join(", ")}.</p>`);
+      parts.push(`<p><strong>Título já existente.</strong> Encontrado em ${duplicates.title.map(name => `“${escapeHtml(name)}”`).join(", ")}.</p>`);
     }
     if (duplicates.svg.length) {
-      parts.push(`<p><strong>Código SVG já existente.</strong> Este mesmo código está salvo em ${duplicates.svg.map(name => `“${name}”`).join(", ")}.</p>`);
+      parts.push(`<p><strong>Código SVG já existente.</strong> Este mesmo código está salvo em ${duplicates.svg.map(name => `“${escapeHtml(name)}”`).join(", ")}.</p>`);
     }
     return parts;
   }
